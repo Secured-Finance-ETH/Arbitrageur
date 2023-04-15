@@ -9,10 +9,17 @@ import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { t
 import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
 import * as ERC20ABI from "../contractABI/ERC20.json" assert { type: "json" };
 
-import { ArbitrageEngine, Order, sleep } from "./arbitrage.js";
+import {
+  ArbitrageEngine,
+  ArbitrageOpportunity,
+  Order,
+  sleep,
+} from "./arbitrage.js";
 import { GasEstimator } from "./secured-finance.js";
 
 import { PositionType } from "./arbitrage.js";
+
+import chalk from "chalk";
 
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 const USDC_ADDRESS = "0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5";
@@ -20,6 +27,8 @@ const EFIL_ADDRESS = "0x25C2EC1A91df7a6e2d4a7f643d515d9b1Fe0B12a";
 
 // Maximum trade token amount
 const MAX_TRADE = new BigNumber(100);
+
+const log = console.log;
 
 const depositUsdcCollateral = async (
   tokenVaultContract: ethers.Contract,
@@ -46,8 +55,8 @@ const depositUsdcCollateral = async (
     new BigNumber(2).pow(new BigNumber(254)).toString()
   );
 
-  console.log("approved USDC");
-  console.log("approved EFIL");
+  log(chalk.green("approved USDC"));
+  log(chalk.green("approved EFIL"));
 };
 
 const main = async () => {
@@ -87,6 +96,8 @@ const main = async () => {
 
   // get list of currency rpc call
   const currencies = await currencyContract.getCurrencies();
+
+  log(chalk.cyan("Getting List of possible lending/borrow orders ..."));
 
   // construct data of input for algortihm to run
   for (const currency of currencies) {
@@ -151,7 +162,12 @@ const main = async () => {
     }
   }
 
-  console.log("possibleOrders: ", possibleOrders);
+  log(
+    chalk.cyan(
+      "List of possible borrow/lend orders based on various maturity dates: ",
+      possibleOrders
+    )
+  );
 
   // for (const possibleOrder of possibleOrders) {
   //   printOrder(possibleOrder);
@@ -162,10 +178,20 @@ const main = async () => {
   const arbitrageEngine = new ArbitrageEngine(gasEstimator, true);
 
   await arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
-  console.log(
-    "arbitrageEngine.arbitrageOpportunities: ",
-    arbitrageEngine.arbitrageOpportunities
+  log(
+    chalk.cyan(
+      "List of carry trade opportunities, sorted based on profitability: "
+    )
   );
+
+  for (const [key, opportunities] of Object.entries(
+    arbitrageEngine.arbitrageOpportunities
+  )) {
+    log(chalk.cyan("For time period of ", key));
+    for (const opportunity of opportunities) {
+      printArbitrageOpportunity(opportunity);
+    }
+  }
 
   const arbitrageOpportunities = Object.values(
     arbitrageEngine.arbitrageOpportunities
@@ -173,7 +199,9 @@ const main = async () => {
 
   const bestArbitrageOpportunity = arbitrageOpportunities[0];
 
-  console.log("bestArbitrageOpportunity: ", bestArbitrageOpportunity);
+  log(chalk.green("Best carry trade opportunity: "));
+
+  printArbitrageOpportunity(bestArbitrageOpportunity);
 
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
@@ -190,8 +218,8 @@ const main = async () => {
 
   const borrowPrice = borrowPosition.price.toString();
 
-  console.log("borrowing ");
-  printOrder(borrowPosition);
+  log(chalk.cyan("Creating carry trade's borrow order ..."));
+  // printOrder(borrowPosition);
 
   // function createOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external returns (bool)
   await lendingControllerContract.createOrder(
@@ -201,6 +229,8 @@ const main = async () => {
     borrowAmount,
     borrowPrice
   );
+
+  log(chalk.green("Successfully create carry trade's borrow order. "));
 
   // swap token A to token B only for gas calculation
 
@@ -221,8 +251,8 @@ const main = async () => {
 
   const lendingPrice = lendingPosition.price.toString();
 
-  console.log("lending Position order");
-  printOrder(lendingPosition);
+  log(chalk.cyan("Creating carry trade's deposit and lending order ..."));
+  // printOrder(lendingPosition);
 
   // function depositAndCreateOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external payable returns (bool)
   await lendingControllerContract.depositAndCreateOrder(
@@ -233,7 +263,9 @@ const main = async () => {
     lendingPrice
   );
 
-  console.log("lending transactionsuccessful!");
+  log(
+    chalk.green("Successfully create carry trade's deposit and lending order.")
+  );
 
   // DONE!
 };
@@ -254,6 +286,14 @@ const printOrder = (order: Order) => {
     posType: order.posType == PositionType.BORROW ? "borrow" : "lend",
     amount: order.amount.toString(),
   });
+};
+
+const printArbitrageOpportunity = (arbitrage: ArbitrageOpportunity) => {
+  log(chalk.cyan("borrowPosition: "));
+  printOrder(arbitrage.borrowPosition);
+  log(chalk.cyan("lendPosition: "));
+  printOrder(arbitrage.lendPosition);
+  log(chalk.cyan("profit", arbitrage.profit));
 };
 
 main();
