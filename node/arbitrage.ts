@@ -1,5 +1,6 @@
 import _ from 'lodash'
 import BigNumber from 'bn.js'
+import axios from 'axios'
  
 export enum PositionType {
   BORROW = 0,
@@ -26,17 +27,55 @@ export interface ArbitrageOpportunity {
   profit: BigNumber;
 }
 
+type CalcArbitrageParams = {
+  borrowGasFee: BigNumber;
+  lendGasFee: BigNumber;
+  swapFee: BigNumber;
+}
+
+type Coin = {
+  id: string
+  name: string
+}
+
+const sleep = async (ms: number): Promise<void> => {
+  return new Promise((resolve) => setTimeout(() => resolve(), ms))
+}
+
 export class ArbitrageEngine {
-  private positions: Order[] = [];
-  private arbitrageOpportunities: Record<string, ArbitrageOpportunity[]> = {};
+  private _arbitrageOpportunities: Record<string, ArbitrageOpportunity[]> = {};
+
+  private static readonly SUPPORTED_TOKENS: Array<Coin> = [
+    { id: 'ETH'.toUpperCase(), name: 'ETH' },
+    { id: 'FIL'.toUpperCase(), name: 'EFIL' },
+    { id: 'BTC'.toUpperCase(), name: 'WBTC' },
+    { id: 'USDC'.toUpperCase(), name: 'USDC' },
+  ]
+
+  private tokenPricesInUsd: Record<string, number>
 
   // TODO: Receive a list of tokens to calculate arbitrage opportunities as input
   constructor() {
-    this.positions = this.parseInput();
+    this.fetchTokenPrices(ArbitrageEngine.SUPPORTED_TOKENS);
   }
 
   protected parseInput(): Array<Order> {
     return []
+  }
+
+  public get arbitrageOpportunities(): Record<string, ArbitrageOpportunity[]> {
+    return this._arbitrageOpportunities;
+  } 
+
+
+  private async fetchTokenPrices (coins: Coin[]): Promise<void> {
+    while (true) {  
+      for (const coin of coins) {
+        const { data } = await axios.get(`https://api.binance.com/api/v3/ticker/price/?symbol=${coin.id}USDT`);
+        this.tokenPricesInUsd[coin.name] = parseFloat(data.price);
+      }
+      await sleep(1000 * 60 * 5)
+    } 
   }
 
   /**
@@ -45,13 +84,18 @@ export class ArbitrageEngine {
   private createOrder() { 
 
   }
+  
 
   /**
    * Calculates arbitrage opportunities for a single maturity date
    * @param positions 
    * @returns Array of arbitrage opportunities
    */
-  private _calculateArbitrageOpportunity(positions: Order[]): Array<ArbitrageOpportunity> {
+  private _calculateArbitrageOpportunity(positions: Order[], params?: CalcArbitrageParams = { 
+    borrowGasFee: new BigNumber(0),
+    lendGasFee: new BigNumber(0),
+    swapFee: new BigNumber(0),
+  }): Array<ArbitrageOpportunity> {
     const arbitrageOpportunities: Array<ArbitrageOpportunity> = []
 
     const [borrowPositions, lendPositions] = _.partition(positions, pos => pos.posType === PositionType.BORROW);
@@ -68,15 +112,16 @@ export class ArbitrageEngine {
 
         // In crypto "unit" is the smallest denomination of a token (1/100) 
         const priceDifferential = borrowPosition.price.sub(lendPosition.price);
+        const totalPriceDifferential = priceDifferential.mul(borrowPosition.amount);
         
         // Depends on gas price, but we can assume it's 1 gwei
-        const dexSwapFee = new BigNumber(3);
-        
+        const dexSwapFee = params.swapFee; 
+      
         // Calculate based on "borrow" + "lend" amounts
-        const borrowGasFees = new BigNumber(10);
-        const lendGasFees = new BigNumber(10);
+        const borrowGasFees = params.borrowGasFee;
+        const lendGasFees = params.lendGasFee;
         
-        const profit = priceDifferential.sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
+        const profit = totalPriceDifferential.sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
 
         // If we can borrow the token at a lower price than we can lend it, we have an arbitrage opportunity
         if (profit.gt(new BigNumber(0))) {
