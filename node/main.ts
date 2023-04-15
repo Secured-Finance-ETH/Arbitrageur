@@ -5,6 +5,8 @@ import { ethers } from "ethers";
 import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
 import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
 import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
+import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
+
 import { assert } from "console";
 import { ArbitrageEngine, Order } from "./arbitrage.js";
 
@@ -13,6 +15,14 @@ const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 const mappingSymboltoERC20Address = {
   EFIL: "",
   USDC: "",
+};
+
+const depositCollateral = (tokenVaultContract: ethers.Contract) => {
+  // deposit collateral USDC
+  tokenVaultContract.deposit(
+    "0x5553444300000000000000000000000000000000000000000000000000000000",
+    1
+  );
 };
 
 const main = async () => {
@@ -36,6 +46,12 @@ const main = async () => {
   const lendingControllerContract = new ethers.Contract(
     LendingMarketControllerABI.default.address,
     LendingMarketControllerABI.default.abi,
+    signer
+  );
+
+  const tokenVaultContract = new ethers.Contract(
+    TokenVaultABI.default.address,
+    TokenVaultABI.default.abi,
     signer
   );
   const possibleOrders: Order[] = [];
@@ -113,11 +129,12 @@ const main = async () => {
 
   const bestArbitrageOpportunity = arbitrageOpportunities[0];
 
-  // TODO: deposit collateral
-
-  // createOrder for token A to borrow
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
+  // depositing USDC as collateral
+  depositCollateral(tokenVaultContract);
+
+  // createOrder for token A to borrow
   const borrowPositionAddress =
     await lendingControllerContract.getLendingMarket(
       borrowPosition.token,
