@@ -2,7 +2,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import BigNumber from "bn.js";
-import { ethers } from "ethers";
+import { ethers, decodeBytes32String } from "ethers";
 import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
 import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
 import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
@@ -13,10 +13,7 @@ import { GasEstimator } from "./secured-finance.js";
 
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 
-const mappingSymboltoERC20Address = {
-  EFIL: "",
-  USDC: "",
-};
+const MAX_TRADE = new BigNumber(100);
 
 const depositCollateral = (tokenVaultContract: ethers.Contract) => {
   // deposit collateral USDC
@@ -35,7 +32,7 @@ const main = async () => {
 
   // Creating a signing account from a private key
   const signer = new ethers.Wallet(
-    "c526ee95bf44d8fc405a158bb884d9d1238d99f0612e9f33d006bb0789009aaa",
+    "b827ecb7903e1283873c5fa79ca2479a1cb961b38a33276eb8ef8c7d810aa57e",
     provider
   );
   const currencyContract = new ethers.Contract(
@@ -103,7 +100,9 @@ const main = async () => {
           price: bestOrderBorrowUnitPrice,
           maturity: maturity,
           posType: 1,
-          amount: bestOrderBorrowTokenQuantity,
+          amount: bestOrderBorrowTokenQuantity.gt(MAX_TRADE)
+            ? MAX_TRADE
+            : bestOrderBorrowTokenQuantity,
         });
       }
 
@@ -113,7 +112,9 @@ const main = async () => {
           price: bestOrderLendUnitPrice,
           maturity: maturity,
           posType: 0,
-          amount: bestOrderLendTokenQuantity,
+          amount: bestOrderLendTokenQuantity.gt(MAX_TRADE)
+            ? MAX_TRADE
+            : bestOrderLendTokenQuantity,
         });
       }
     }
@@ -123,65 +124,103 @@ const main = async () => {
   const gasEstimator = new GasEstimator(provider)
   const arbitrageEngine = new ArbitrageEngine(gasEstimator, true);
 
+  console.log("possibleOrders: ", possibleOrders);
+
   arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
+  console.log(
+    "arbitrageEngine.arbitrageOpportunities: ",
+    arbitrageEngine.arbitrageOpportunities
+  );
+
   const arbitrageOpportunities = Object.values(
     arbitrageEngine.arbitrageOpportunities
-  )[0];
+  )[1];
 
   const bestArbitrageOpportunity = arbitrageOpportunities[0];
 
+  console.log("bestArbitrageOpportunity: ", bestArbitrageOpportunity);
+
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
+  console.log(bestArbitrageOpportunity.borrowPosition.amount.toString());
+
   // depositing USDC as collateral
-  depositCollateral(tokenVaultContract);
+  // depositCollateral(tokenVaultContract);
 
-  // createOrder for token A to borrow
-  const borrowPositionAddress =
-    await lendingControllerContract.getLendingMarket(
-      borrowPosition.token,
-      borrowPosition.maturity
-    );
-
-  const borrowPositionContract = new ethers.Contract(
-    borrowPositionAddress,
-    LendingMarketABI.default.abi,
-    signer
-  );
-
-  // function createOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice)
   // assuming borrow side enum is 1
-  borrowPositionContract.createOrder(
-    borrowPosition.token,
-    borrowPosition.maturity,
+
+  const borrowingParam = [
+    ethers.encodeBytes32String(borrowPosition.token.name),
+    borrowPosition.maturity
+      .mul(new BigNumber(10).pow(new BigNumber(18)))
+      .toString(),
     1,
-    borrowPosition.amount,
-    borrowPosition.price
+    borrowPosition.amount.toString(),
+    borrowPosition.price.toString(),
+  ];
+
+  const borrowTokenAddress = ethers.encodeBytes32String(
+    borrowPosition.token.name
   );
+  const borrowMaturity = borrowPosition.maturity.toString();
+
+  const borrowAmount = borrowPosition.amount
+    .mul(new BigNumber(10).pow(new BigNumber(6)))
+    .toString();
+  const borrowPrice = borrowPosition.price.toString();
+
+  console.log("borrow order param: ", [
+    borrowTokenAddress,
+    borrowMaturity,
+    1,
+    borrowAmount,
+    borrowPrice,
+  ]);
+
+  await lendingControllerContract.createOrder(
+    borrowTokenAddress,
+    borrowMaturity,
+    1,
+    borrowAmount,
+    borrowPrice
+  );
+
+  console.log("borrowing transaction successful!");
 
   // swap token A to token B only for gas calculation
 
   // createOrder for token B to lend
   const lendingPosition = bestArbitrageOpportunity.lendPosition;
-  const lendingPositionAddress =
-    await lendingControllerContract.getLendingMarket(
-      lendingPosition.token,
-      lendingPosition.maturity
-    );
 
-  const lendingPositionContract = new ethers.Contract(
-    lendingPositionAddress,
-    LendingMarketABI.default.abi,
-    signer
+  const lendingTokenAddress = ethers.encodeBytes32String(
+    lendingPosition.token.name
   );
+
+  const lendingMaturity = lendingPosition.maturity.toString();
+  const lendingAmount = lendingPosition.amount
+    .mul(new BigNumber(10).pow(new BigNumber(18)))
+    .toString();
+
+  const lendingPrice = lendingPosition.price.toString();
+
+  console.log("lending order params: ", [
+    lendingTokenAddress,
+    lendingMaturity,
+    0,
+    lendingAmount,
+    lendingPrice,
+  ]);
 
   // function depositAndCreateOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external payable returns (bool)
-  lendingPositionContract.depositAndCreateOrder(
-    lendingPosition.token,
-    lendingPosition.maturity,
+  await lendingControllerContract.depositAndCreateOrder(
+    lendingTokenAddress,
+    lendingMaturity,
     0,
-    lendingPosition.amount,
-    lendingPosition.price
+    lendingAmount,
+    lendingPrice
   );
+
+  console.log("lending transactionsuccessful!");
 
   // DONE!
 };
