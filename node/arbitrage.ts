@@ -43,6 +43,8 @@ const sleep = async (ms: number): Promise<void> => {
 };
 
 export class ArbitrageEngine {
+  private readonly MATURE_PRICE = 10_000;
+
   private _arbitrageOpportunities: Record<string, ArbitrageOpportunity[]> = {};
 
   private static readonly SUPPORTED_TOKENS: Array<Coin> = [
@@ -109,10 +111,7 @@ export class ArbitrageEngine {
    * @returns rate in basis points
    */
   private calculateRate(price: number, maturity: number) {
-    const PAR_VALUE = 10000;
-    const PAR_VALUE_RATE = 1000000;
-    
-    return ((PAR_VALUE / price - 1) / this.yearToFraction(maturity)) * PAR_VALUE_RATE;
+    return (this.MATURE_PRICE - price) / (price * this.yearToFraction(maturity));
   }
 
   /**
@@ -169,7 +168,7 @@ export class ArbitrageEngine {
         const profit = new BigNumber(carryTradeAmountInUsd).sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
 
         // If we can borrow the token at a lower price than we can lend it, we have an arbitrage opportunity
-        if (profit.lt(new BigNumber(0))) {
+        if (profit.gt(new BigNumber(0))) {
           arbitrageOpportunities.push({
             borrowPosition,
             lendPosition,
