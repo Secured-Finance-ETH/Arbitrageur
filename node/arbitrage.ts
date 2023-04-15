@@ -55,8 +55,18 @@ export class ArbitrageEngine {
   private tokenPricesInUsd: Record<string, number>
 
   // TODO: Receive a list of tokens to calculate arbitrage opportunities as input
-  constructor() {
-    this.fetchTokenPrices(ArbitrageEngine.SUPPORTED_TOKENS);
+  constructor(isDebug: boolean = false) {
+
+    if (isDebug) {
+      this.tokenPricesInUsd = {
+        'ETH': 1,
+        'EFIL': 1,
+        'WBTC': 1,
+        'USDC': 1,
+      }
+    } else {
+      this.fetchTokenPrices(ArbitrageEngine.SUPPORTED_TOKENS);
+    }
   }
 
   protected parseInput(): Array<Order> {
@@ -72,6 +82,7 @@ export class ArbitrageEngine {
     while (true) {  
       for (const coin of coins) {
         const { data } = await axios.get(`https://api.binance.com/api/v3/ticker/price/?symbol=${coin.id}USDT`);
+        console.log(`Fetched price for ${coin.name}: ${data.price}`)
         this.tokenPricesInUsd[coin.name] = parseFloat(data.price);
       }
       await sleep(1000 * 60 * 5)
