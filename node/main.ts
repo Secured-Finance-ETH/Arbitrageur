@@ -17,15 +17,19 @@ import { PositionType } from "./arbitrage.js";
 
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 const USDC_ADDRESS = '0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5'
+const EFIL_ADDRESS = '0x25C2EC1A91df7a6e2d4a7f643d515d9b1Fe0B12a'
 
 // Maximum trade token amount
 const MAX_TRADE = new BigNumber(100);
 
 const depositUsdcCollateral = async (tokenVaultContract: ethers.Contract, signer: Signer): Promise<void> => {
   const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20ABI.default.abi, signer)  
+  const efilContract = new ethers.Contract(EFIL_ADDRESS, ERC20ABI.default.abi, signer)
   
   const tokenVaultAddress = await tokenVaultContract.getAddress()
   await usdcContract.approve(tokenVaultAddress, new BigNumber(2).pow(new BigNumber(254)).toString());
+  await efilContract.approve(tokenVaultAddress, new BigNumber(2).pow(new BigNumber(254)).toString());
+
   console.log('approved USDC')
 };
 
@@ -61,6 +65,8 @@ const main = async () => {
   );
 
   const possibleOrders: Order[] = [];
+
+  // await depositUsdcCollateral(tokenVaultContract, signer)
 
   // get list of currency rpc call
   const currencies = await currencyContract.getCurrencies();
@@ -138,7 +144,7 @@ const main = async () => {
   const gasEstimator = new GasEstimator(provider);
   const arbitrageEngine = new ArbitrageEngine(gasEstimator, true);
 
-  arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
+  await arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
   console.log(
     "arbitrageEngine.arbitrageOpportunities: ",
     arbitrageEngine.arbitrageOpportunities
@@ -153,6 +159,7 @@ const main = async () => {
   console.log("bestArbitrageOpportunity: ", bestArbitrageOpportunity);
 
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
+  console.log('borrowPositions', printOrder(borrowPosition))
 
   const borrowTokenAddress = ethers.encodeBytes32String(
     borrowPosition.token.name
