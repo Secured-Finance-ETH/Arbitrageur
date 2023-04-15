@@ -1,10 +1,10 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { encodeBytes32String, ethers } from "ethers";
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
-import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
+import { ethers } from "ethers";
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json";
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json";
+import * as LendingMarketABI from "../contractABI/LendingMarket.json";
 
 const main = async () => {
   const network = "goerli";
@@ -31,16 +31,13 @@ const main = async () => {
   );
 
   const currencies = await currencyContract.getCurrencies();
-  console.log("currencies ", currencies);
 
   // get list of currency rpc call
-  for (const currency in currencies) {
+  for (const currency of currencies) {
     // for each currency, call getLendingMarkets -> return address[]
     const contractAddresses = await lendingControllerContract.getLendingMarkets(
-      encodeBytes32String(currency)
+      currency
     );
-
-    console.log("contractAddresses ", contractAddresses);
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
     for (const contractAddress in contractAddresses) {
       const lendingMarketContract = new ethers.Contract(
@@ -51,6 +48,7 @@ const main = async () => {
       const maturity = await lendingMarketContract.getMaturity();
       const borrowUnitPrice = await lendingMarketContract.getBorrowUnitPrice();
       const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
+      console.log("maturity ", maturity, "borrowUnitPrice ", borrowUnitPrice, "lendingUnitPrice ", lendingUnitPrice);
     }
   }
 
