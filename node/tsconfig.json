@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "target": "es6",
-    "moduleResolution": "node",
+    "module": "ES6",
+    "target": "ES6",
+    "moduleResolution": "node16",
     "sourceMap": true,
     "outDir": "dist",
     "resolveJsonModule": true,

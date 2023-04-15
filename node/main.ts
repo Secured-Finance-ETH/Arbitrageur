@@ -1,6 +1,6 @@
 
 import { ethers } from 'ethers'
-import currencyController from '../contractABI/CurrencyController.json'
+import * as CurrencyControllerABI from '../contractABI/CurrencyController.json'
 
 const main = async () => {
   const network = process.env.ETHEREUM_NETWORK;
@@ -11,11 +11,9 @@ const main = async () => {
 
   // Creating a signing account from a private key
   const signer = new ethers.Wallet(process.env.SIGNER_PRIVATE_KEY, provider);
-
-  const currencyContract = new ethers.Contract(currencyController.address, currencyController.abi)
+  const currencyContract = new ethers.Contract(CurrencyControllerABI.default.address, CurrencyControllerABI.default.abi)
 
   const currencies = currencyContract.getCurrencies()
-
 
   console.log("currencies" , currencies)
   

@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "npx tsc && node dist/main.js",
+    "start": "npx tsc --module es6 && node dist/main.cjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,5 +14,6 @@
     "@types/node": "^18.15.11",
     "ethers": "^6.3.0",
     "typescript": "^5.0.4"
-  }
+  },
+  "type": "module"
 }
