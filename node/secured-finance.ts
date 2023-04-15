@@ -22,8 +22,6 @@ export class GasEstimator {
       TokenVaultABI.default.abi,
       provider
     );
-  
-
   }
 
   // TODO: Implement this method
@@ -36,10 +34,10 @@ export class GasEstimator {
       to: LendingMarketABI.default.address,
       data: this.lendingMarketControllerContract.interface.encodeFunctionData("depositAndCreateOrder", [
         encodeBytes32String("USDC"),
-        new BigNumber(Math.floor(Date.now() / 1000)),
+        new BigNumber(Math.floor(Date.now() / 1000)).toString(),
         0,
-        new BigNumber(0),
-        new BigNumber(0),
+        new BigNumber(0).toString(),
+        new BigNumber(0).toString(),
       ])
     })
 
@@ -61,10 +59,10 @@ export class GasEstimator {
       to: LendingMarketControllerABI.default.address,
       data: this.lendingMarketControllerContract.interface.encodeFunctionData("createOrder", [
         encodeBytes32String("USDC"),
-        new BigNumber(Math.floor(Date.now() / 1000)),
+        new BigNumber(Math.floor(Date.now() / 1000)).toString(),
         1,
-        new BigNumber(0),
-        new BigNumber(0),
+        new BigNumber(0).toString(),
+        new BigNumber(0).toString(),
       ])
 
     })
