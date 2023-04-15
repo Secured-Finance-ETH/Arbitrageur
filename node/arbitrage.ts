@@ -1,16 +1,16 @@
 import _ from 'lodash'
 import BigNumber from 'bn.js'
  
-enum PositionType {
+export enum PositionType {
   BORROW = 0,
   LEND = 1,
 } 
 
-interface Token {
+export interface Token {
   name: string; // bytes32
 }
 
-interface Position {
+export interface Order {
   token: Token;
   price: BigNumber;
   // Maturity date is uint256 in the contract, but we can use BigNumberish to represent it
@@ -20,21 +20,38 @@ interface Position {
   amount: BigNumber;
 }
 
-interface ArbitrageOpportunity {
-  borrowPosition: Position;
-  lendPosition: Position;
+export interface ArbitrageOpportunity {
+  borrowPosition: Order;
+  lendPosition: Order;
   profit: BigNumber;
 }
 
-class ArbitrageEngine {
-  constructor() {}
+export class ArbitrageEngine {
+  private positions: Order[] = [];
+  private arbitrageOpportunities: Record<string, ArbitrageOpportunity[]> = {};
+
+  // TODO: Receive a list of tokens to calculate arbitrage opportunities as input
+  constructor() {
+    this.positions = this.parseInput();
+  }
+
+  protected parseInput(): Array<Order> {
+    return []
+  }
+
+  /**
+   * Creates order
+   */
+  private createOrder() { 
+
+  }
 
   /**
    * Calculates arbitrage opportunities for a single maturity date
    * @param positions 
    * @returns Array of arbitrage opportunities
    */
-  private _calculateArbitrageOpportunity(positions: Position[]): Array<ArbitrageOpportunity> {
+  private _calculateArbitrageOpportunity(positions: Order[]): Array<ArbitrageOpportunity> {
     const arbitrageOpportunities: Array<ArbitrageOpportunity> = []
 
     const [borrowPositions, lendPositions] = _.partition(positions, pos => pos.posType === PositionType.BORROW);
@@ -49,7 +66,7 @@ class ArbitrageEngine {
           return;
         }
 
-        // In USD 
+        // In crypto "unit" is the smallest denomination of a token (1/100) 
         const priceDifferential = borrowPosition.price.sub(lendPosition.price);
         
         // Depends on gas price, but we can assume it's 1 gwei
@@ -85,21 +102,18 @@ class ArbitrageEngine {
    * @param positions Array of positions 
    * @returns Record of maturity date to array of arbitrage opportunities 
    */
-  public calculateArbitrageOpportunities(positions: Position[]): Record<string, ArbitrageOpportunity[]> {
+  public calculateArbitrageOpportunities(positions: Order[]): void {
     const positionsByMaturity = _.groupBy(positions, pos => pos.maturity.toString());
-
-    const arbitrageOpportunities: Record<string, Array<ArbitrageOpportunity>> = {};
 
     // Iterate through every maturity date
     Object.entries(positionsByMaturity).forEach(([maturity, sameMaturityPositions]) => {
-      const arbitrageOpportunities = this._calculateArbitrageOpportunity(sameMaturityPositions);
-      arbitrageOpportunities[maturity] = arbitrageOpportunities;
+      this.arbitrageOpportunities[maturity] = this._calculateArbitrageOpportunity(sameMaturityPositions);
     })
-
-    return arbitrageOpportunities;
   }
 
+  public execute() {
+    // "depositAndCreatorOrder"
+    // "createOrder"
+  }
 }
-
-
 
