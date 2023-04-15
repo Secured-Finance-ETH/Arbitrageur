@@ -3,6 +3,9 @@ dotenv.config()
 
 import { ethers } from 'ethers'
 import * as CurrencyControllerABI from '../contractABI/CurrencyController.json' assert { type: 'json' }
+import * as LendingMarketControllerABI from '../contractABI/LendingMarketController.json' assert { type: 'json' }
+import * as LendingMarketABI from '../contractABI/LendingMarket.json' assert { type: 'json' }
+
 
 const main = async () => {
   const network = process.env.ETHEREUM_NETWORK;
@@ -12,18 +15,30 @@ const main = async () => {
   );
 
   // Creating a signing account from a private key
-  const signer = new ethers.Wallet(process.env.SIGNER_PRIVATE_KEY, provider);
+  // const signer = new ethers.Wallet(process.env.SIGNER_PRIVATE_KEY, provider);
   const currencyContract = new ethers.Contract(CurrencyControllerABI.default.address, CurrencyControllerABI.default.abi)
-
   const currencies = currencyContract.getCurrencies()
 
-  console.log("currencies" , currencies)
-  
+
   // get list of currency rpc call
+  for (const currency in currencies) {  
+    const lendingControllerContract = new ethers.Contract(LendingMarketControllerABI.default.address, LendingMarketControllerABI.default.abi)
 
-  // for each currency, call getLendingMarkets -> return address[]
+    // for each currency, call getLendingMarkets -> return address[]
+    const contractAddresses = lendingControllerContract.getLendingMarkets(currency)
 
-  // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice
+    // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
+    for(const contractAddress in contractAddresses) {
+      const lendingMarketContract = new ethers.Contract(LendingMarketABI.default.address, LendingMarketABI.default.abi)
+      const maturity = lendingMarketContract.getMaturity()
+      const borrowUnitPrice =  lendingMarketContract.getBorrowUnitPrice()
+      const lendingUnitPrice =   lendingMarketContract.getLendUnitPrice()
+      
+    }
+  }
+
+
+
 
   // construct data of input for algortihm to run
 
