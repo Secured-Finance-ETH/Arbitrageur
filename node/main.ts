@@ -1,6 +1,8 @@
+import * as dotenv from 'dotenv'
+dotenv.config()
 
 import { ethers } from 'ethers'
-import * as CurrencyControllerABI from '../contractABI/CurrencyController.json'
+import * as CurrencyControllerABI from '../contractABI/CurrencyController.json' assert { type: 'json' }
 
 const main = async () => {
   const network = process.env.ETHEREUM_NETWORK;

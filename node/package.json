@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "npx tsc --module es6 && node dist/main.cjs",
+    "start": "npx tsc --module esnext && node --experimental-json-modules dist/node/main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -15,5 +15,8 @@
     "ethers": "^6.3.0",
     "typescript": "^5.0.4"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.0.3"
+  }
 }
