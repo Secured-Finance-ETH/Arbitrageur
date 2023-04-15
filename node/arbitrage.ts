@@ -1,7 +1,7 @@
-import _ from 'lodash'
-import BigNumber from 'bn.js'
-import axios from 'axios'
- 
+import _ from "lodash";
+import BigNumber from "bn.js";
+import axios from "axios";
+
 export enum PositionType {
   BORROW = 0,
   LEND = 1,
@@ -31,28 +31,28 @@ type CalcArbitrageParams = {
   borrowGasFee: BigNumber;
   lendGasFee: BigNumber;
   swapFee: BigNumber;
-}
+};
 
 type Coin = {
-  id: string
-  name: string
-}
+  id: string;
+  name: string;
+};
 
 const sleep = async (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(() => resolve(), ms))
-}
+  return new Promise((resolve) => setTimeout(() => resolve(), ms));
+};
 
 export class ArbitrageEngine {
   private _arbitrageOpportunities: Record<string, ArbitrageOpportunity[]> = {};
 
   private static readonly SUPPORTED_TOKENS: Array<Coin> = [
-    { id: 'ETH'.toUpperCase(), name: 'ETH' },
-    { id: 'FIL'.toUpperCase(), name: 'EFIL' },
-    { id: 'BTC'.toUpperCase(), name: 'WBTC' },
-    { id: 'USDC'.toUpperCase(), name: 'USDC' },
-  ]
+    { id: "ETH".toUpperCase(), name: "ETH" },
+    { id: "FIL".toUpperCase(), name: "EFIL" },
+    { id: "BTC".toUpperCase(), name: "WBTC" },
+    { id: "USDC".toUpperCase(), name: "USDC" },
+  ];
 
-  private tokenPricesInUsd: Record<string, number>
+  private tokenPricesInUsd: Record<string, number>;
 
   // TODO: Receive a list of tokens to calculate arbitrage opportunities as input
   constructor(isDebug: boolean = false) {
@@ -70,23 +70,28 @@ export class ArbitrageEngine {
   }
 
   protected parseInput(): Array<Order> {
-    return []
+    return [];
   }
 
   public get arbitrageOpportunities(): Record<string, ArbitrageOpportunity[]> {
     return this._arbitrageOpportunities;
-  } 
+  }
 
-
-  private async fetchTokenPrices (coins: Coin[]): Promise<void> {
-    while (true) {  
+  private async fetchTokenPrices(coins: Coin[]): Promise<void> {
+    while (true) {
       for (const coin of coins) {
+<<<<<<< Updated upstream
         const { data } = await axios.get(`https://api.binance.com/api/v3/ticker/price/?symbol=${coin.id}USDT`);
         console.log(`Fetched price for ${coin.name}: ${data.price}`)
+=======
+        const { data } = await axios.get(
+          `https://api.binance.com/api/v3/ticker/price/?symbol=${coin.id}USDT`
+        );
+>>>>>>> Stashed changes
         this.tokenPricesInUsd[coin.name] = parseFloat(data.price);
       }
-      await sleep(1000 * 60 * 5)
-    } 
+      await sleep(1000 * 60 * 5);
+    }
   }
 
   /**
@@ -99,12 +104,15 @@ export class ArbitrageEngine {
    * @param positions
    * @returns Array of arbitrage opportunities
    */
-  private _calculateArbitrageOpportunity(positions: Order[], params: CalcArbitrageParams = { 
-    borrowGasFee: new BigNumber(0),
-    lendGasFee: new BigNumber(0),
-    swapFee: new BigNumber(0),
-  }): Array<ArbitrageOpportunity> {
-    const arbitrageOpportunities: Array<ArbitrageOpportunity> = []
+  private _calculateArbitrageOpportunity(
+    positions: Order[],
+    params: CalcArbitrageParams = {
+      borrowGasFee: new BigNumber(0),
+      lendGasFee: new BigNumber(0),
+      swapFee: new BigNumber(0),
+    }
+  ): Array<ArbitrageOpportunity> {
+    const arbitrageOpportunities: Array<ArbitrageOpportunity> = [];
 
     const [borrowPositions, lendPositions] = _.partition(
       positions,
@@ -122,16 +130,21 @@ export class ArbitrageEngine {
 
         // In crypto "unit" is the smallest denomination of a token (1/100)
         const priceDifferential = borrowPosition.price.sub(lendPosition.price);
-        const totalPriceDifferential = priceDifferential.mul(borrowPosition.amount);
-        
+        const totalPriceDifferential = priceDifferential.mul(
+          borrowPosition.amount
+        );
+
         // Depends on gas price, but we can assume it's 1 gwei
-        const dexSwapFee = params.swapFee; 
-      
+        const dexSwapFee = params.swapFee;
+
         // Calculate based on "borrow" + "lend" amounts
         const borrowGasFees = params.borrowGasFee;
         const lendGasFees = params.lendGasFee;
-        
-        const profit = totalPriceDifferential.sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
+
+        const profit = totalPriceDifferential
+          .sub(dexSwapFee)
+          .sub(borrowGasFees)
+          .sub(lendGasFees);
 
         // If we can borrow the token at a lower price than we can lend it, we have an arbitrage opportunity
         if (profit.gt(new BigNumber(0))) {

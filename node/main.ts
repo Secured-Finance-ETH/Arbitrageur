@@ -38,10 +38,14 @@ const main = async () => {
     LendingMarketControllerABI.default.abi,
     signer
   );
-
-  const currencies = await currencyContract.getCurrencies();
+  const possibleOrders: Order[] = [];
 
   // get list of currency rpc call
+  const currencies = await currencyContract.getCurrencies();
+
+  const contractAddressMapping = {};
+
+  // construct data of input for algortihm to run
   for (const currency of currencies) {
     const symbol = ethers.decodeBytes32String(currency);
 
@@ -77,40 +81,91 @@ const main = async () => {
       const bestOrderLendUnitPrice = lendOrders[0][0];
       const bestOrderLendTokenQuantity = lendOrders[1][0];
 
-      const possibleOrders: Order[] = [];
+      if (bestOrderBorrowUnitPrice > 0) {
+        possibleOrders.push({
+          token: { name: currency },
+          price: bestOrderBorrowUnitPrice,
+          maturity: maturity,
+          posType: 0,
+          amount: bestOrderBorrowTokenQuantity,
+        });
+      }
 
-      possibleOrders.push({
-        token: { name: currency },
-        price: bestOrderBorrowUnitPrice,
-        maturity: maturity,
-        posType: 0,
-        amount: bestOrderBorrowTokenQuantity,
-      });
-
-      possibleOrders.push({
-        token: { name: currency },
-        price: bestOrderLendUnitPrice,
-        maturity: maturity,
-        posType: 0,
-        amount: bestOrderLendTokenQuantity,
-      });
-
-      const arbitrageEngine = new ArbitrageEngine();
-
-      const arbitrageOpportunities =
-        arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
+      if (bestOrderLendUnitPrice > 0) {
+        possibleOrders.push({
+          token: { name: currency },
+          price: bestOrderLendUnitPrice,
+          maturity: maturity,
+          posType: 0,
+          amount: bestOrderLendTokenQuantity,
+        });
+      }
     }
   }
 
-  // construct data of input for algortihm to run
-
   // alforithm to run -> get token A to borrow and token B to lend at the same maturity
+  const arbitrageEngine = new ArbitrageEngine();
+
+  arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
+  const arbitrageOpportunities = Object.values(
+    arbitrageEngine.arbitrageOpportunities
+  )[0];
+
+  const bestArbitrageOpportunity = arbitrageOpportunities[0];
+
+  // TODO: deposit collateral
 
   // createOrder for token A to borrow
+  const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
-  // swap token A to token B using 1 inch
+  const borrowPositionAddress =
+    await lendingControllerContract.getLendingMarket(
+      borrowPosition.token,
+      borrowPosition.maturity
+    );
+
+  const borrowPositionContract = new ethers.Contract(
+    borrowPositionAddress,
+    LendingMarketABI.default.abi,
+    signer
+  );
+
+  // function createOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice)
+  // assuming borrow side enum is 1
+  borrowPositionContract.createOrder(
+    borrowPosition.token,
+    borrowPosition.maturity,
+    1,
+    borrowPosition.amount,
+    borrowPosition.price
+  );
+
+  // swap token A to token B only for gas calculation
 
   // createOrder for token B to lend
+  const lendingPosition = bestArbitrageOpportunity.lendPosition;
+  const lendingPositionAddress =
+    await lendingControllerContract.getLendingMarket(
+      lendingPosition.token,
+      lendingPosition.maturity
+    );
+
+  const lendingPositionContract = new ethers.Contract(
+    lendingPositionAddress,
+    LendingMarketABI.default.abi,
+    signer
+  );
+
+  // function depositAndCreateOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external payable returns (bool)
+  lendingPositionContract.depositAndCreateOrder(
+    lendingPosition.token,
+    lendingPosition.maturity,
+    0,
+    lendingPosition.amount,
+    lendingPosition.price
+  );
+
+  // DONE!
 };
 
 main();
