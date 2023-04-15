@@ -1,6 +1,9 @@
 //@ts-ignore 
 import { ArbitrageEngine, Order, PositionType } from '../arbitrage';
+//@ts-ignore 
+import { GasEstimator } from '../secured-finance';
 import { BN as BigNumber } from 'bn.js'
+import { ethers } from 'ethers';
 
 describe('ArbitrageEngine', () => {
   describe('calculateArbitrageOpportunities', () => {
@@ -8,14 +11,15 @@ describe('ArbitrageEngine', () => {
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
 
-      const engine = new ArbitrageEngine(true);
+      const provider = new ethers.InfuraProvider('goerli', 'bb57d75bbd6d4dc08f2a454c74c7dd55')
+      const gasEstimator = new GasEstimator(provider)
+      const engine = new ArbitrageEngine(gasEstimator, true);
       const positions: Array<Order> = [
         { token: {  name: "ETH" }, posType: PositionType.BORROW, price: new BigNumber(90), amount: new BigNumber(50), maturity: new BigNumber(nextWeek.getTime() / 1000) },
         { token: {  name: "EFIL" }, posType: PositionType.LEND, price: new BigNumber(80), amount: new BigNumber(90), maturity: new BigNumber(nextWeek.getTime() / 1000) },
       ];
       engine.calculateArbitrageOpportunities(positions);
       const opportunities = engine.arbitrageOpportunities;
-      console.log(opportunities)
 
       expect(Object.keys(opportunities).length).toBe(1);
 
