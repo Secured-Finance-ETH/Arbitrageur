@@ -70,9 +70,13 @@ const main = async () => {
     }
 
     // for each currency, call getLendingMarkets -> return address[]
-    const contractAddresses = await lendingControllerContract.getLendingMarkets(
+    let contractAddresses = await lendingControllerContract.getLendingMarkets(
       currency
     );
+
+    // FOR DEMO ONLY: only get the first maturity
+    contractAddresses = contractAddresses.slice(0, 1);
+
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
     for (const contractAddress of contractAddresses) {
       const lendingMarketContract = new ethers.Contract(
@@ -83,7 +87,7 @@ const main = async () => {
       const maturity = await lendingMarketContract.getMaturity();
 
       //  To get best rate without quantity use, const borrowUnitPrice = await lendingMarketContract.getBorrowUnitPrice();
-      const borrowOrders = await lendingMarketContract.getBorrowOrderBook(10);
+      const borrowOrders = await lendingMarketContract.getBorrowOrderBook(1);
       const bestOrderBorrowUnitPrice = borrowOrders[0][0];
       const bestOrderBorrowTokenQuantity = borrowOrders[1][0];
       // console.log({ symbol, maturity });
@@ -93,7 +97,7 @@ const main = async () => {
       // );
 
       // To get best rate without quantity use, const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
-      const lendOrders = await lendingMarketContract.getLendOrderBook(10);
+      const lendOrders = await lendingMarketContract.getLendOrderBook(1);
       const bestOrderLendUnitPrice = lendOrders[0][0];
       const bestOrderLendTokenQuantity = lendOrders[1][0];
 
@@ -102,7 +106,7 @@ const main = async () => {
           token: { name: currency },
           price: bestOrderBorrowUnitPrice,
           maturity: maturity,
-          posType: 0,
+          posType: 1,
           amount: bestOrderBorrowTokenQuantity,
         });
       }
