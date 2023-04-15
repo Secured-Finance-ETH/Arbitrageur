@@ -3,34 +3,51 @@ dotenv.config();
 
 import BigNumber from "bn.js";
 import { ethers, decodeBytes32String, Signer } from "ethers";
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json"
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json"
-import * as LendingMarketABI from "../contractABI/LendingMarket.json"
-import * as TokenVaultABI from "../contractABI/TokenVault.json" 
-import * as ERC20ABI from "../contractABI/ERC20.json" 
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
+import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
+import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
+import * as ERC20ABI from "../contractABI/ERC20.json" assert { type: "json" };
 
-
-import { ArbitrageEngine, Order } from "./arbitrage.js";
+import { ArbitrageEngine, Order, sleep } from "./arbitrage.js";
 import { GasEstimator } from "./secured-finance.js";
 
 import { PositionType } from "./arbitrage.js";
 
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
-const USDC_ADDRESS = '0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5'
-const EFIL_ADDRESS = '0x25C2EC1A91df7a6e2d4a7f643d515d9b1Fe0B12a'
+const USDC_ADDRESS = "0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5";
+const EFIL_ADDRESS = "0x25C2EC1A91df7a6e2d4a7f643d515d9b1Fe0B12a";
 
 // Maximum trade token amount
 const MAX_TRADE = new BigNumber(100);
 
-const depositUsdcCollateral = async (tokenVaultContract: ethers.Contract, signer: Signer): Promise<void> => {
-  const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20ABI.default.abi, signer)  
-  const efilContract = new ethers.Contract(EFIL_ADDRESS, ERC20ABI.default.abi, signer)
-  
-  const tokenVaultAddress = await tokenVaultContract.getAddress()
-  await usdcContract.approve(tokenVaultAddress, new BigNumber(2).pow(new BigNumber(254)).toString());
-  await efilContract.approve(tokenVaultAddress, new BigNumber(2).pow(new BigNumber(254)).toString());
+const depositUsdcCollateral = async (
+  tokenVaultContract: ethers.Contract,
+  signer: Signer
+): Promise<void> => {
+  const usdcContract = new ethers.Contract(
+    USDC_ADDRESS,
+    ERC20ABI.default.abi,
+    signer
+  );
+  const efilContract = new ethers.Contract(
+    EFIL_ADDRESS,
+    ERC20ABI.default.abi,
+    signer
+  );
 
-  console.log('approved USDC')
+  const tokenVaultAddress = await tokenVaultContract.getAddress();
+  await usdcContract.approve(
+    tokenVaultAddress,
+    new BigNumber(2).pow(new BigNumber(254)).toString()
+  );
+  await efilContract.approve(
+    tokenVaultAddress,
+    new BigNumber(2).pow(new BigNumber(254)).toString()
+  );
+
+  console.log("approved USDC");
+  console.log("approved EFIL");
 };
 
 const main = async () => {
@@ -45,7 +62,7 @@ const main = async () => {
     "b827ecb7903e1283873c5fa79ca2479a1cb961b38a33276eb8ef8c7d810aa57e",
     provider
   );
-  
+
   const currencyContract = new ethers.Contract(
     CurrencyControllerABI.default.address,
     CurrencyControllerABI.default.abi,
@@ -113,7 +130,7 @@ const main = async () => {
           token: { name: symbol },
           price: bestOrderBorrowUnitPrice,
           maturity: maturity,
-          posType: PositionType.BORROW,
+          posType: PositionType.LEND,
           amount: bestOrderBorrowTokenQuantity.gt(MAX_TRADE)
             ? MAX_TRADE
             : bestOrderBorrowTokenQuantity,
@@ -125,7 +142,7 @@ const main = async () => {
           token: { name: symbol },
           price: bestOrderLendUnitPrice,
           maturity: maturity,
-          posType: PositionType.LEND,
+          posType: PositionType.BORROW,
           amount: bestOrderLendTokenQuantity.gt(MAX_TRADE)
             ? MAX_TRADE
             : bestOrderLendTokenQuantity,
@@ -159,7 +176,6 @@ const main = async () => {
   console.log("bestArbitrageOpportunity: ", bestArbitrageOpportunity);
 
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
-  console.log('borrowPositions', printOrder(borrowPosition))
 
   const borrowTokenAddress = ethers.encodeBytes32String(
     borrowPosition.token.name
@@ -174,13 +190,8 @@ const main = async () => {
 
   const borrowPrice = borrowPosition.price.toString();
 
-  console.log("borrow order param: ", [
-    borrowTokenAddress,
-    borrowMaturity,
-    borrowPositionType,
-    borrowAmount,
-    borrowPrice,
-  ]);
+  console.log("borrowing ");
+  printOrder(borrowPosition);
 
   // function createOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external returns (bool)
   await lendingControllerContract.createOrder(
@@ -206,15 +217,12 @@ const main = async () => {
     .mul(new BigNumber(10).pow(new BigNumber(18)))
     .toString();
 
+  await sleep(1000 * 60 * 0.5);
+
   const lendingPrice = lendingPosition.price.toString();
 
-  console.log("lending order params: ", [
-    lendingTokenAddress,
-    lendingMaturity,
-    lendingPositionType,
-    lendingAmount,
-    lendingPrice,
-  ]);
+  console.log("lending Position order");
+  printOrder(lendingPosition);
 
   // function depositAndCreateOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external payable returns (bool)
   await lendingControllerContract.depositAndCreateOrder(
