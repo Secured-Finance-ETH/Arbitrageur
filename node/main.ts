@@ -1,47 +1,56 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { ethers } from "ethers";
+import { encodeBytes32String, ethers } from "ethers";
 import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
 import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
 import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
 
 const main = async () => {
-  const network = process.env.ETHEREUM_NETWORK;
+  const network = "goerli";
   const provider = new ethers.InfuraProvider(
     network,
-    process.env.INFURA_API_KEY
+    "bb57d75bbd6d4dc08f2a454c74c7dd55"
   );
 
   // Creating a signing account from a private key
-  // const signer = new ethers.Wallet(process.env.SIGNER_PRIVATE_KEY, provider);
+  const signer = new ethers.Wallet(
+    "c526ee95bf44d8fc405a158bb884d9d1238d99f0612e9f33d006bb0789009aaa",
+    provider
+  );
   const currencyContract = new ethers.Contract(
     CurrencyControllerABI.default.address,
-    CurrencyControllerABI.default.abi
+    CurrencyControllerABI.default.abi,
+    signer
   );
 
-  const currencies = currencyContract.getCurrencies();
+  const lendingControllerContract = new ethers.Contract(
+    LendingMarketControllerABI.default.address,
+    LendingMarketControllerABI.default.abi,
+    signer
+  );
+
+  const currencies = await currencyContract.getCurrencies();
+  console.log("currencies ", currencies);
 
   // get list of currency rpc call
   for (const currency in currencies) {
-    const lendingControllerContract = new ethers.Contract(
-      LendingMarketControllerABI.default.address,
-      LendingMarketControllerABI.default.abi
+    // for each currency, call getLendingMarkets -> return address[]
+    const contractAddresses = await lendingControllerContract.getLendingMarkets(
+      encodeBytes32String(currency)
     );
 
-    // for each currency, call getLendingMarkets -> return address[]
-    const contractAddresses =
-      lendingControllerContract.getLendingMarkets(currency);
-
+    console.log("contractAddresses ", contractAddresses);
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
     for (const contractAddress in contractAddresses) {
       const lendingMarketContract = new ethers.Contract(
         LendingMarketABI.default.address,
-        LendingMarketABI.default.abi
+        LendingMarketABI.default.abi,
+        signer
       );
-      const maturity = lendingMarketContract.getMaturity();
-      const borrowUnitPrice = lendingMarketContract.getBorrowUnitPrice();
-      const lendingUnitPrice = lendingMarketContract.getLendUnitPrice();
+      const maturity = await lendingMarketContract.getMaturity();
+      const borrowUnitPrice = await lendingMarketContract.getBorrowUnitPrice();
+      const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
     }
   }
 
