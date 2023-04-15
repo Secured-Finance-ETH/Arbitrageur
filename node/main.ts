@@ -1,11 +1,12 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { ethers } from "ethers";
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
-import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
-import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
+import BigNumber from "bn.js";
+import { ethers, decodeBytes32String } from "ethers";
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json";
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json";
+import * as LendingMarketABI from "../contractABI/LendingMarket.json";
+import * as TokenVaultABI from "../contractABI/TokenVault.json";
 
 import { assert } from "console";
 import { ArbitrageEngine, Order } from "./arbitrage.js";
@@ -75,7 +76,7 @@ const main = async () => {
     );
 
     // FOR DEMO ONLY: only get the first maturity
-    contractAddresses = contractAddresses.slice(0, 1);
+    contractAddresses = contractAddresses.slice(0, 4);
 
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
     for (const contractAddress of contractAddresses) {
@@ -84,12 +85,12 @@ const main = async () => {
         LendingMarketABI.default.abi,
         signer
       );
-      const maturity = await lendingMarketContract.getMaturity();
+      const maturity = new BigNumber(await lendingMarketContract.getMaturity());
 
       //  To get best rate without quantity use, const borrowUnitPrice = await lendingMarketContract.getBorrowUnitPrice();
       const borrowOrders = await lendingMarketContract.getBorrowOrderBook(1);
-      const bestOrderBorrowUnitPrice = borrowOrders[0][0];
-      const bestOrderBorrowTokenQuantity = borrowOrders[1][0];
+      const bestOrderBorrowUnitPrice = new BigNumber(borrowOrders[0][0]);
+      const bestOrderBorrowTokenQuantity = new BigNumber(borrowOrders[1][0]);
       // console.log({ symbol, maturity });
       // console.log(
       //   "bestOrderBorrowUnitPrice ",
@@ -98,12 +99,12 @@ const main = async () => {
 
       // To get best rate without quantity use, const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
       const lendOrders = await lendingMarketContract.getLendOrderBook(1);
-      const bestOrderLendUnitPrice = lendOrders[0][0];
-      const bestOrderLendTokenQuantity = lendOrders[1][0];
+      const bestOrderLendUnitPrice = new BigNumber(lendOrders[0][0]);
+      const bestOrderLendTokenQuantity = new BigNumber(lendOrders[1][0]);
 
-      if (bestOrderBorrowUnitPrice > 0) {
+      if (bestOrderBorrowUnitPrice.gt(new BigNumber(0))) {
         possibleOrders.push({
-          token: { name: currency },
+          token: { name: symbol },
           price: bestOrderBorrowUnitPrice,
           maturity: maturity,
           posType: 1,
@@ -111,9 +112,9 @@ const main = async () => {
         });
       }
 
-      if (bestOrderLendUnitPrice > 0) {
+      if (bestOrderLendUnitPrice.gt(new BigNumber(0))) {
         possibleOrders.push({
-          token: { name: currency },
+          token: { name: symbol },
           price: bestOrderLendUnitPrice,
           maturity: maturity,
           posType: 0,
@@ -123,8 +124,8 @@ const main = async () => {
     }
   }
 
-  // alforithm to run -> get token A to borrow and token B to lend at the same maturity
-  const arbitrageEngine = new ArbitrageEngine();
+  // algorithm to run -> get token A to borrow and token B to lend at the same maturity
+  const arbitrageEngine = new ArbitrageEngine(true);
 
   arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
   const arbitrageOpportunities = Object.values(
