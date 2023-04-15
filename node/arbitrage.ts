@@ -94,6 +94,27 @@ export class ArbitrageEngine {
    */
   private createOrder() {}
 
+
+  private yearToFraction(maturity: number): number {
+    const oneDayInSeconds = 24 * 60 * 60; // number of seconds in one day
+    const nowInSeconds = Math.floor(Date.now() / 1000); // current time in seconds
+    const secondsToMaturity = maturity - nowInSeconds; // number of seconds between now and maturity
+    const daysToMaturity = Math.ceil(secondsToMaturity / oneDayInSeconds); // round up to get number of days
+
+    return daysToMaturity / 365;
+  }
+
+  /**
+   * Converts a loan price to a rate
+   * @returns rate in basis points
+   */
+  private calculateRate(price: number, maturity: number) {
+    const PAR_VALUE = 10000;
+    const PAR_VALUE_RATE = 1000000;
+    
+    return ((PAR_VALUE / price - 1) / this.yearToFraction(maturity)) * PAR_VALUE_RATE;
+  }
+
   /**
    * Calculates arbitrage opportunities for a single maturity date
    * @param positions
@@ -121,8 +142,19 @@ export class ArbitrageEngine {
         }
 
         // In crypto "unit" is the smallest denomination of a token (1/100)
-        const priceDifferential = borrowPosition.price.sub(lendPosition.price);
-        const totalPriceDifferential = priceDifferential.mul(borrowPosition.amount);
+        const borrowPositionRate = this.calculateRate(borrowPosition.price.toNumber(), borrowPosition.maturity.toNumber());
+        const lendPositionRate = this.calculateRate(lendPosition.price.toNumber(), lendPosition.maturity.toNumber());
+
+        const rateDifferential = lendPositionRate - borrowPositionRate;
+
+        if (rateDifferential < 0) {
+          return;
+        }
+
+        const carryTradeAmount = rateDifferential * borrowPosition.amount.toNumber();
+        const carryTradeAmountInUsd = carryTradeAmount * this.tokenPricesInUsd[borrowPosition.token.name];
+
+        // const maxAmountInLendToken = this.tokenPricesInUsd[lendPosition.token.name] * lendPosition.amount.toNumber();
         
         // Depends on gas price, but we can assume it's 1 gwei
         const dexSwapFee = params.swapFee; 
@@ -131,10 +163,10 @@ export class ArbitrageEngine {
         const borrowGasFees = params.borrowGasFee;
         const lendGasFees = params.lendGasFee;
         
-        const profit = totalPriceDifferential.sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
+        const profit = new BigNumber(carryTradeAmountInUsd).sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
 
         // If we can borrow the token at a lower price than we can lend it, we have an arbitrage opportunity
-        if (profit.gt(new BigNumber(0))) {
+        if (profit.lt(new BigNumber(0))) {
           arbitrageOpportunities.push({
             borrowPosition,
             lendPosition,
