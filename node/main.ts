@@ -164,10 +164,13 @@ const main = async () => {
 
   log(
     chalk.cyan(
-      "List of possible borrow/lend orders based on various maturity dates: ",
-      possibleOrders
+      "List of possible borrow/lend orders based on various maturity dates: "
     )
   );
+
+  for (const possibleOrder of possibleOrders) {
+    printOrder(possibleOrder);
+  }
 
   // for (const possibleOrder of possibleOrders) {
   //   printOrder(possibleOrder);
