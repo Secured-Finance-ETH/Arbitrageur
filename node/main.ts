@@ -39,9 +39,9 @@ const main = async () => {
       currency
     );
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
-    for (const contractAddress in contractAddresses) {
+    for (const contractAddress of contractAddresses) {
       const lendingMarketContract = new ethers.Contract(
-        LendingMarketABI.default.address,
+        contractAddress,
         LendingMarketABI.default.abi,
         signer
       );
