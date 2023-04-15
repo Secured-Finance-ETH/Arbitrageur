@@ -2,7 +2,7 @@
   "name": "node",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "start": "npx tsc && node dist/main.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^18.15.11",
+    "ethers": "^6.3.0",
     "typescript": "^5.0.4"
   }
 }

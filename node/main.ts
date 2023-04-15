@@ -1,9 +1,9 @@
 
-const { ethers } = require("ethers");
+import { ethers } from 'ethers'
 
 const main = async () => {
   const network = process.env.ETHEREUM_NETWORK;
-  const provider = new ethers.providers.InfuraProvider(
+  const provider = new ethers.InfuraProvider(
     network,
     process.env.INFURA_API_KEY
   );
