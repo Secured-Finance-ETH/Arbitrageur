@@ -13,9 +13,12 @@ import * as ERC20ABI from "../contractABI/ERC20.json"
 import { ArbitrageEngine, Order } from "./arbitrage.js";
 import { GasEstimator } from "./secured-finance.js";
 
+import { PositionType } from "./arbitrage.js";
+
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 const USDC_ADDRESS = '0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5'
 
+// Maximum trade token amount
 const MAX_TRADE = new BigNumber(100);
 
 const depositUsdcCollateral = async (tokenVaultContract: ethers.Contract, signer: Signer): Promise<void> => {
@@ -62,8 +65,6 @@ const main = async () => {
   // get list of currency rpc call
   const currencies = await currencyContract.getCurrencies();
 
-  const contractAddressMapping = {};
-
   // construct data of input for algortihm to run
   for (const currency of currencies) {
     const symbol = ethers.decodeBytes32String(currency);
@@ -77,8 +78,8 @@ const main = async () => {
       currency
     );
 
-    // FOR DEMO ONLY: only get the first maturity
-    contractAddresses = contractAddresses.slice(0, 4);
+    // FOR DEMO ONLY: only get the first nth maturity
+    contractAddresses = contractAddresses.slice(0, 2);
 
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
     for (const contractAddress of contractAddresses) {
@@ -94,6 +95,8 @@ const main = async () => {
       const bestOrderBorrowUnitPrice = new BigNumber(borrowOrders[0][0]);
       const bestOrderBorrowTokenQuantity = new BigNumber(borrowOrders[1][0]);
 
+      //////////////////////////////////////////
+
       // To get best rate without quantity use, const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
       const lendOrders = await lendingMarketContract.getLendOrderBook(1);
       const bestOrderLendUnitPrice = new BigNumber(lendOrders[0][0]);
@@ -104,7 +107,7 @@ const main = async () => {
           token: { name: symbol },
           price: bestOrderBorrowUnitPrice,
           maturity: maturity,
-          posType: 1,
+          posType: PositionType.BORROW,
           amount: bestOrderBorrowTokenQuantity.gt(MAX_TRADE)
             ? MAX_TRADE
             : bestOrderBorrowTokenQuantity,
@@ -116,7 +119,7 @@ const main = async () => {
           token: { name: symbol },
           price: bestOrderLendUnitPrice,
           maturity: maturity,
-          posType: 0,
+          posType: PositionType.LEND,
           amount: bestOrderLendTokenQuantity.gt(MAX_TRADE)
             ? MAX_TRADE
             : bestOrderLendTokenQuantity,
@@ -125,11 +128,15 @@ const main = async () => {
     }
   }
 
-  // algorithm to run -> get token A to borrow and token B to lend at the same maturity
-  const gasEstimator = new GasEstimator(provider)
-  const arbitrageEngine = new ArbitrageEngine(gasEstimator, true);
-
   console.log("possibleOrders: ", possibleOrders);
+
+  // for (const possibleOrder of possibleOrders) {
+  //   printOrder(possibleOrder);
+  // }
+
+  // algorithm to run -> get token A to borrow and token B to lend at the same maturity
+  const gasEstimator = new GasEstimator(provider);
+  const arbitrageEngine = new ArbitrageEngine(gasEstimator, true);
 
   arbitrageEngine.calculateArbitrageOpportunities(possibleOrders);
   console.log(
@@ -147,38 +154,28 @@ const main = async () => {
 
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
-  console.log(bestArbitrageOpportunity.borrowPosition.amount.toString());
-
-  // assuming borrow side enum is 1
-
-  const borrowingParam = [
-    ethers.encodeBytes32String(borrowPosition.token.name),
-    borrowPosition.maturity
-      .mul(new BigNumber(10).pow(new BigNumber(18)))
-      .toString(),
-    1,
-    borrowPosition.amount.toString(),
-    borrowPosition.price.toString(),
-  ];
-
   const borrowTokenAddress = ethers.encodeBytes32String(
     borrowPosition.token.name
   );
   const borrowMaturity = borrowPosition.maturity.toString();
 
+  const borrowPositionType = PositionType.BORROW;
+
   const borrowAmount = borrowPosition.amount
     .mul(new BigNumber(10).pow(new BigNumber(6)))
     .toString();
+
   const borrowPrice = borrowPosition.price.toString();
 
   console.log("borrow order param: ", [
     borrowTokenAddress,
     borrowMaturity,
-    1,
+    borrowPositionType,
     borrowAmount,
     borrowPrice,
   ]);
 
+  // function createOrder(bytes32 _ccy, uint256 _maturity, enum ProtocolTypes.Side _side, uint256 _amount, uint256 _unitPrice) external returns (bool)
   await lendingControllerContract.createOrder(
     borrowTokenAddress,
     borrowMaturity,
@@ -186,8 +183,6 @@ const main = async () => {
     borrowAmount,
     borrowPrice
   );
-
-  console.log("borrowing transaction successful!");
 
   // swap token A to token B only for gas calculation
 
@@ -198,6 +193,7 @@ const main = async () => {
     lendingPosition.token.name
   );
 
+  const lendingPositionType = PositionType.LEND;
   const lendingMaturity = lendingPosition.maturity.toString();
   const lendingAmount = lendingPosition.amount
     .mul(new BigNumber(10).pow(new BigNumber(18)))
@@ -208,7 +204,7 @@ const main = async () => {
   console.log("lending order params: ", [
     lendingTokenAddress,
     lendingMaturity,
-    0,
+    lendingPositionType,
     lendingAmount,
     lendingPrice,
   ]);
@@ -217,7 +213,7 @@ const main = async () => {
   await lendingControllerContract.depositAndCreateOrder(
     lendingTokenAddress,
     lendingMaturity,
-    0,
+    lendingPositionType,
     lendingAmount,
     lendingPrice
   );
@@ -225,6 +221,24 @@ const main = async () => {
   console.log("lending transactionsuccessful!");
 
   // DONE!
+};
+
+const depositCollateral = (tokenVaultContract: ethers.Contract) => {
+  // deposit collateral USDC
+  tokenVaultContract.deposit(
+    "0x5553444300000000000000000000000000000000000000000000000000000000",
+    new BigNumber(1).mul(new BigNumber(10).pow(new BigNumber(6)))
+  );
+};
+
+const printOrder = (order: Order) => {
+  console.log({
+    "token name": order.token.name,
+    price: order.price.toString(),
+    maturity: new Date(order.maturity.toNumber() * 1000).toISOString(),
+    posType: order.posType == PositionType.BORROW ? "borrow" : "lend",
+    amount: order.amount.toString(),
+  });
 };
 
 main();

@@ -4,8 +4,8 @@ import axios from "axios";
 import { GasEstimator } from "./secured-finance.js";
 
 export enum PositionType {
-  BORROW = 0,
-  LEND = 1,
+  LEND = 0,
+  BORROW = 1,
 }
 
 export interface Token {
@@ -59,7 +59,10 @@ export class ArbitrageEngine {
   private tokenPricesInUsd: Record<string, number>;
 
   // TODO: Receive a list of tokens to calculate arbitrage opportunities as input
-  constructor(private readonly gasEstimator: GasEstimator, isDebug: boolean = false) {
+  constructor(
+    private readonly gasEstimator: GasEstimator,
+    isDebug: boolean = false
+  ) {
     this._debugMode = isDebug;
 
     if (this._debugMode) {
@@ -100,7 +103,6 @@ export class ArbitrageEngine {
    */
   private createOrder() {}
 
-
   private yearToFraction(maturity: number): number {
     const oneDayInSeconds = 24 * 60 * 60; // number of seconds in one day
     const nowInSeconds = Math.floor(Date.now() / 1000); // current time in seconds
@@ -115,7 +117,9 @@ export class ArbitrageEngine {
    * @returns rate in basis points
    */
   private calculateRate(price: number, maturity: number) {
-    return (this.MATURE_PRICE - price) / (price * this.yearToFraction(maturity));
+    return (
+      (this.MATURE_PRICE - price) / (price * this.yearToFraction(maturity))
+    );
   }
 
   /**
@@ -148,8 +152,14 @@ export class ArbitrageEngine {
         }
 
         // In crypto "unit" is the smallest denomination of a token (1/100)
-        const borrowPositionRate = this.calculateRate(borrowPosition.price.toNumber(), borrowPosition.maturity.toNumber());
-        const lendPositionRate = this.calculateRate(lendPosition.price.toNumber(), lendPosition.maturity.toNumber());
+        const borrowPositionRate = this.calculateRate(
+          borrowPosition.price.toNumber(),
+          borrowPosition.maturity.toNumber()
+        );
+        const lendPositionRate = this.calculateRate(
+          lendPosition.price.toNumber(),
+          lendPosition.maturity.toNumber()
+        );
 
         const rateDifferential = lendPositionRate - borrowPositionRate;
 
@@ -157,17 +167,22 @@ export class ArbitrageEngine {
           return;
         }
 
-        const carryTradeAmount = rateDifferential * borrowPosition.amount.toNumber();
-        const carryTradeAmountInUsd = carryTradeAmount * this.tokenPricesInUsd[borrowPosition.token.name];
-        
+        const carryTradeAmount =
+          rateDifferential * borrowPosition.amount.toNumber();
+        const carryTradeAmountInUsd =
+          carryTradeAmount * this.tokenPricesInUsd[borrowPosition.token.name];
+
         // Depends on gas price, but we can assume it's 1 gwei
         const dexSwapFee = params.swapFee;
 
         // Calculate based on "borrow" + "lend" amounts
         const borrowGasFees = params.borrowGasFee;
         const lendGasFees = params.lendGasFee;
-        
-        const profit = new BigNumber(carryTradeAmountInUsd).sub(dexSwapFee).sub(borrowGasFees).sub(lendGasFees);
+
+        const profit = new BigNumber(carryTradeAmountInUsd)
+          .sub(dexSwapFee)
+          .sub(borrowGasFees)
+          .sub(lendGasFees);
 
         // If we can borrow the token at a lower price than we can lend it, we have an arbitrage opportunity
         if (profit.gt(new BigNumber(0))) {
@@ -192,26 +207,30 @@ export class ArbitrageEngine {
    * @param positions Array of positions
    * @returns Record of maturity date to array of arbitrage opportunities
    */
-  public async calculateArbitrageOpportunities(positions: Order[]): Promise<void> {
+  public async calculateArbitrageOpportunities(
+    positions: Order[]
+  ): Promise<void> {
     const positionsByMaturity = _.groupBy(positions, (pos) =>
       pos.maturity.toString()
     );
 
     // Calculate gas fees
-    const [lendGasFee, borrowGasFee, swapFee] = await Promise.all([
-      this.gasEstimator.estimateLendingFee(),
-      this.gasEstimator.estimateBorrowingFee(),
-      this.gasEstimator.estimateSwapFees(),
-    ])
-    console.log(`Lend gas fee: ${lendGasFee.toString()}`)
-    console.log(`Borrow gas fee: ${borrowGasFee.toString()}`)
-    console.log(`Swap fee: ${swapFee.toString()}`)
-    
-    const gasFeeParams = this._debugMode ? {
-      borrowGasFee: new BigNumber(lendGasFee.toString()),
-      lendGasFee: new BigNumber(borrowGasFee.toString()),
-      swapFee: new BigNumber(swapFee.toString()),
-    } : undefined
+    // const [lendGasFee, borrowGasFee, swapFee] = await Promise.all([
+    //   this.gasEstimator.estimateLendingFee(),
+    //   this.gasEstimator.estimateBorrowingFee(),
+    //   this.gasEstimator.estimateSwapFees(),
+    // ]);
+    // console.log(`Lend gas fee: ${lendGasFee.toString()}`);
+    // console.log(`Borrow gas fee: ${borrowGasFee.toString()}`);
+    // console.log(`Swap fee: ${swapFee.toString()}`);
+
+    // const gasFeeParams = this._debugMode
+    //   ? {
+    //       borrowGasFee: new BigNumber(lendGasFee.toString()),
+    //       lendGasFee: new BigNumber(borrowGasFee.toString()),
+    //       swapFee: new BigNumber(swapFee.toString()),
+    //     }
+    //   : undefined;
 
     // Iterate through every maturity date
     Object.entries(positionsByMaturity).forEach(
