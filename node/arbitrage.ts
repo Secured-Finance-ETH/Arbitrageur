@@ -217,7 +217,7 @@ export class ArbitrageEngine {
     Object.entries(positionsByMaturity).forEach(
       ([maturity, sameMaturityPositions]) => {
         this.arbitrageOpportunities[maturity] =
-          this._calculateArbitrageOpportunity(sameMaturityPositions, gasFeeParams);
+          this._calculateArbitrageOpportunity(sameMaturityPositions);
       }
     );
   }

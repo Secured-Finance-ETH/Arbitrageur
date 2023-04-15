@@ -1,10 +1,9 @@
 import { Signer, ethers, encodeBytes32String, BigNumberish, Provider } from "ethers";
 import { BN as BigNumber } from 'bn.js';
 
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
-import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
-import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json"
+import * as LendingMarketABI from "../contractABI/LendingMarket.json"
+import * as TokenVaultABI from "../contractABI/TokenVault.json"
 
 
 export class GasEstimator {
@@ -12,7 +11,7 @@ export class GasEstimator {
   private tokenVaultContract: ethers.Contract;
 
   constructor(private readonly provider: Provider) {
-    this.lendingMarketControllerContract =  new ethers.Contract(
+    this.lendingMarketControllerContract = new ethers.Contract(
       LendingMarketControllerABI.default.address,
       LendingMarketControllerABI.default.abi,
       provider

@@ -2,25 +2,28 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import BigNumber from "bn.js";
-import { ethers, decodeBytes32String } from "ethers";
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
-import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
-import * as TokenVaultABI from "../contractABI/TokenVault.json" assert { type: "json" };
+import { ethers, decodeBytes32String, Signer } from "ethers";
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json"
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json"
+import * as LendingMarketABI from "../contractABI/LendingMarket.json"
+import * as TokenVaultABI from "../contractABI/TokenVault.json" 
+import * as ERC20ABI from "../contractABI/ERC20.json" 
+
 
 import { ArbitrageEngine, Order } from "./arbitrage.js";
 import { GasEstimator } from "./secured-finance.js";
 
 const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
+const USDC_ADDRESS = '0xC851b7AF9FD0dBdb2a1a424D4f8866890a0722B5'
 
 const MAX_TRADE = new BigNumber(100);
 
-const depositCollateral = (tokenVaultContract: ethers.Contract) => {
-  // deposit collateral USDC
-  tokenVaultContract.deposit(
-    "0x5553444300000000000000000000000000000000000000000000000000000000",
-    1
-  );
+const depositUsdcCollateral = async (tokenVaultContract: ethers.Contract, signer: Signer): Promise<void> => {
+  const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20ABI.default.abi, signer)  
+  
+  const tokenVaultAddress = await tokenVaultContract.getAddress()
+  await usdcContract.approve(tokenVaultAddress, new BigNumber(2).pow(new BigNumber(254)).toString());
+  console.log('approved USDC')
 };
 
 const main = async () => {
@@ -35,6 +38,7 @@ const main = async () => {
     "b827ecb7903e1283873c5fa79ca2479a1cb961b38a33276eb8ef8c7d810aa57e",
     provider
   );
+  
   const currencyContract = new ethers.Contract(
     CurrencyControllerABI.default.address,
     CurrencyControllerABI.default.abi,
@@ -52,6 +56,7 @@ const main = async () => {
     TokenVaultABI.default.abi,
     signer
   );
+
   const possibleOrders: Order[] = [];
 
   // get list of currency rpc call
@@ -143,9 +148,6 @@ const main = async () => {
   const borrowPosition = bestArbitrageOpportunity.borrowPosition;
 
   console.log(bestArbitrageOpportunity.borrowPosition.amount.toString());
-
-  // depositing USDC as collateral
-  // depositCollateral(tokenVaultContract);
 
   // assuming borrow side enum is 1
 
