@@ -2,9 +2,12 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { ethers } from "ethers";
-import * as CurrencyControllerABI from "../contractABI/CurrencyController.json";
-import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json";
-import * as LendingMarketABI from "../contractABI/LendingMarket.json";
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
+import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
+import { assert } from "console";
+
+const EXCLUDED_CURRENCIES_SYMBOL = ["ETH", "WBTC"];
 
 const main = async () => {
   const network = "goerli";
@@ -34,6 +37,12 @@ const main = async () => {
 
   // get list of currency rpc call
   for (const currency of currencies) {
+    const symbol = ethers.decodeBytes32String(currency);
+
+    if (EXCLUDED_CURRENCIES_SYMBOL.includes(symbol)) {
+      continue;
+    }
+
     // for each currency, call getLendingMarkets -> return address[]
     const contractAddresses = await lendingControllerContract.getLendingMarkets(
       currency
@@ -48,7 +57,14 @@ const main = async () => {
       const maturity = await lendingMarketContract.getMaturity();
       const borrowUnitPrice = await lendingMarketContract.getBorrowUnitPrice();
       const lendingUnitPrice = await lendingMarketContract.getLendUnitPrice();
-      console.log("maturity ", maturity, "borrowUnitPrice ", borrowUnitPrice, "lendingUnitPrice ", lendingUnitPrice);
+      console.log(
+        "maturity ",
+        maturity,
+        "borrowUnitPrice ",
+        borrowUnitPrice,
+        "lendingUnitPrice ",
+        lendingUnitPrice
+      );
     }
   }
 
@@ -62,13 +78,5 @@ const main = async () => {
 
   // createOrder for token B to lend
 };
-
-// // Creating and sending the transaction object
-// const tx = await signer.sendTransaction({
-//   to: "<to_account>",
-//   value: ethers.utils.parseUnits("0.001", "ether"),
-// });
-
-// const receipt = await tx.wait();
 
 main();
