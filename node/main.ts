@@ -1,11 +1,10 @@
-import * as dotenv from 'dotenv'
-dotenv.config()
+import * as dotenv from "dotenv";
+dotenv.config();
 
-import { ethers } from 'ethers'
-import * as CurrencyControllerABI from '../contractABI/CurrencyController.json' assert { type: 'json' }
-import * as LendingMarketControllerABI from '../contractABI/LendingMarketController.json' assert { type: 'json' }
-import * as LendingMarketABI from '../contractABI/LendingMarket.json' assert { type: 'json' }
-
+import { ethers } from "ethers";
+import * as CurrencyControllerABI from "../contractABI/CurrencyController.json" assert { type: "json" };
+import * as LendingMarketControllerABI from "../contractABI/LendingMarketController.json" assert { type: "json" };
+import * as LendingMarketABI from "../contractABI/LendingMarket.json" assert { type: "json" };
 
 const main = async () => {
   const network = process.env.ETHEREUM_NETWORK;
@@ -16,29 +15,35 @@ const main = async () => {
 
   // Creating a signing account from a private key
   // const signer = new ethers.Wallet(process.env.SIGNER_PRIVATE_KEY, provider);
-  const currencyContract = new ethers.Contract(CurrencyControllerABI.default.address, CurrencyControllerABI.default.abi)
-  const currencies = currencyContract.getCurrencies()
+  const currencyContract = new ethers.Contract(
+    CurrencyControllerABI.default.address,
+    CurrencyControllerABI.default.abi
+  );
 
+  const currencies = currencyContract.getCurrencies();
 
   // get list of currency rpc call
-  for (const currency in currencies) {  
-    const lendingControllerContract = new ethers.Contract(LendingMarketControllerABI.default.address, LendingMarketControllerABI.default.abi)
+  for (const currency in currencies) {
+    const lendingControllerContract = new ethers.Contract(
+      LendingMarketControllerABI.default.address,
+      LendingMarketControllerABI.default.abi
+    );
 
     // for each currency, call getLendingMarkets -> return address[]
-    const contractAddresses = lendingControllerContract.getLendingMarkets(currency)
+    const contractAddresses =
+      lendingControllerContract.getLendingMarkets(currency);
 
     // for each address contract, call getMaturity, getBorrowUnitPrice, getLendUnitPrice, corresponding maturity
-    for(const contractAddress in contractAddresses) {
-      const lendingMarketContract = new ethers.Contract(LendingMarketABI.default.address, LendingMarketABI.default.abi)
-      const maturity = lendingMarketContract.getMaturity()
-      const borrowUnitPrice =  lendingMarketContract.getBorrowUnitPrice()
-      const lendingUnitPrice =   lendingMarketContract.getLendUnitPrice()
-      
+    for (const contractAddress in contractAddresses) {
+      const lendingMarketContract = new ethers.Contract(
+        LendingMarketABI.default.address,
+        LendingMarketABI.default.abi
+      );
+      const maturity = lendingMarketContract.getMaturity();
+      const borrowUnitPrice = lendingMarketContract.getBorrowUnitPrice();
+      const lendingUnitPrice = lendingMarketContract.getLendUnitPrice();
     }
   }
-
-
-
 
   // construct data of input for algortihm to run
 
@@ -49,9 +54,7 @@ const main = async () => {
   // swap token A to token B using 1 inch
 
   // createOrder for token B to lend
-
-  
-}
+};
 
 // // Creating and sending the transaction object
 // const tx = await signer.sendTransaction({
@@ -60,6 +63,5 @@ const main = async () => {
 // });
 
 // const receipt = await tx.wait();
-
 
 main();
