@@ -63,12 +63,12 @@ const main = async () => {
   const network = "goerli";
   const provider = new ethers.InfuraProvider(
     network,
-    "bb57d75bbd6d4dc08f2a454c74c7dd55"
+    process.env.INFURA_API_KEY
   );
 
   // Creating a signing account from a private key
   const signer = new ethers.Wallet(
-    "b827ecb7903e1283873c5fa79ca2479a1cb961b38a33276eb8ef8c7d810aa57e",
+    process.env.SIGNER_PRIVATE_KEY,
     provider
   );
 
