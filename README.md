@@ -7,7 +7,7 @@ It creates a strategy to maximize interest rate differentials, then executes it 
 
 ## 🏆 Award
 
-Interest Carry-Trade Arbitrageur won the **Best DeFi Award** at [ETHTokyo2023](https://ethglobal.com/showcase/interest-carry-trade-arbitrageur-4scrx). The project was recognized for its innovative approach to leveraging interest rate differentials in the DeFi space, contributing to the growth of the Secured Finance ecosystem.
+Interest Carry-Trade Arbitrageur won the **Best DeFi Award** for [Secured Finance](https://secured.finance/) at [**ETHTokyo2023**](https://ethglobal.com/showcase/interest-carry-trade-arbitrageur-4scrx). The project was recognized for its innovative approach to leveraging interest rate differentials in the DeFi space, contributing to the growth of the Secured Finance ecosystem.
 
 ## Languages
 
@@ -36,7 +36,7 @@ Add `.env` file with the following values:
 To start the Rust bot, run the following command in the project directory:
 
 ```bash
-cargo **run**
+cargo run
 ```
 
 ### Node
