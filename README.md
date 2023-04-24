@@ -5,6 +5,10 @@ Automated token carry swap bot 🤖 exploits interest rate 💰 **differentials*
 Interest Carry-Trade Arbitrageur looks for interest rate differentials between lending/borrowing order pairs on Secured Finance. 
 It creates a strategy to maximize interest rate differentials, then executes it by borrowing token X, swapping it, and lending token Y for a higher yield (APR).
 
+## 🏆 Award
+
+Interest Carry-Trade Arbitrageur won the **Best DeFi Award** at [ETHTokyo2023](https://ethglobal.com/showcase/interest-carry-trade-arbitrageur-4scrx). The project was recognized for its innovative approach to leveraging interest rate differentials in the DeFi space, contributing to the growth of the Secured Finance ecosystem.
+
 ## Languages
 
 - Rust
