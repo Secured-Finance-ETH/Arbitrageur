@@ -29,12 +29,12 @@ pub struct Order {
   pub amount: U256,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Opportunity {
-  borrow_position: Order,
-  lend_position: Order,
+  pub borrow_position: Order,
+  pub lend_position: Order,
   // In USD
-  profit: f64,
+  pub profit: f64,
 }
 
 pub struct Arbitrage {

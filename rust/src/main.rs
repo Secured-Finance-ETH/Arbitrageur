@@ -3,14 +3,14 @@ mod utils;
 mod contract;
 
 
-use std::{sync::Arc};
+use std::{sync::Arc, ops::Mul};
 use ethers::{prelude::*, abi::{Address}};
 use arbitrage::{Token, Order, PositionType, Arbitrage};
 use contract::{generate_signer};
 
 use dotenv::dotenv;
 use lazy_static::lazy_static;
-use crate::{contract::extract_address, utils::bytes32_to_string};
+use crate::{contract::extract_address, utils::{bytes32_to_string, string_to_bytes32}, arbitrage::Opportunity};
 
 // Define contract interfaces
 ethers::contract::abigen!(CurrencyController, "../contractABI/CurrencyController.json");
@@ -21,13 +21,10 @@ lazy_static! {
     static ref MAX_TRADE: U256 = U256::from(100);
 }
 
-async fn calculate_best_orders(currencies: &Vec<[u8; 32]>) -> Vec<Order> {
+async fn calculate_best_orders(currencies: &Vec<[u8; 32]>, lending_market_controller: &LendingMarketController<SignerMiddleware<Provider<Http>, LocalWallet>>) -> Vec<Order> {
     let mut possible_orders: Vec<Order> = vec!();
 
     let signer: Arc<SignerMiddleware<Provider<Http>, LocalWallet> > = generate_signer().unwrap().into();
-
-    let lending_market_controller_address = extract_address("../contractABI/LendingMarketController.json").unwrap();
-    let lending_market_controller = LendingMarketController::new(lending_market_controller_address, signer.clone());
 
     for currency in currencies {
         let lending_markets_addresses = lending_market_controller.get_lending_markets(currency.clone()).call().await.unwrap() as Vec<Address>;
@@ -80,22 +77,73 @@ async fn calculate_best_orders(currencies: &Vec<[u8; 32]>) -> Vec<Order> {
     return possible_orders;
 }
 
+async fn execute_best_opportunity(opportunities: &Vec<Opportunity>, lending_market_controller: &LendingMarketController<SignerMiddleware<Provider<Http>, LocalWallet>>) {
+    // Execute best arbitrage opportunity, assuming that the first opportunity is the best
+    let best_opportunity = opportunities.get(0).unwrap();
+    println!("Best opportunity: {:?}", best_opportunity);
+
+    let borrow_order = &best_opportunity.borrow_position;
+
+    let borrow_token_name = string_to_bytes32(&borrow_order.token.name);
+    let borrow_maturity = borrow_order.maturity;
+    let borrow_price = borrow_order.price;
+    let borrow_amount = borrow_order.amount.mul( U256::from(10).pow( U256::from(18) ) );
+    
+    // Create "borrow" position
+    lending_market_controller.create_order(
+        borrow_token_name,
+        borrow_maturity.into(),
+        1,
+        borrow_amount,
+        borrow_price.into(),
+    ).send().await.unwrap();
+    println!("Created borrow position: {:?}", borrow_order);
+
+    // Create "lend" position
+    let lend_order = &best_opportunity.lend_position;
+    let lend_token_name = string_to_bytes32(&lend_order.token.name);
+    let lend_maturity = lend_order.maturity;
+    let lend_price = lend_order.price;
+    let lend_amount = lend_order.amount.mul( U256::from(10).pow( U256::from(18) ) );
+
+    lending_market_controller.create_order(
+        lend_token_name,
+        lend_maturity.into(),
+        0,
+        lend_amount,
+        lend_price.into(),
+    ).send().await.unwrap();
+    println!("Created lend position: {:?}", lend_order);
+}
+
 #[tokio::main]
 async fn main() {
     // Load the variables from the .env file
     dotenv().ok();
 
-    let currency_controller_address = extract_address("../contractABI/CurrencyController.json").unwrap();
-
+    // Setup contracts
     let signer: Arc<SignerMiddleware<Provider<Http>, LocalWallet> > = generate_signer().unwrap().into();
+
+    let currency_controller_address = extract_address("../contractABI/CurrencyController.json").unwrap();
     let currency_controller = CurrencyController::new(currency_controller_address, signer.clone());
+
+    let lending_market_controller_address = extract_address("../contractABI/LendingMarketController.json").unwrap();
+    let lending_market_controller = LendingMarketController::new(lending_market_controller_address, signer.clone());
+    // endregion
 
     let supported_currencies = currency_controller.get_currencies().call().await.unwrap() as Vec<[u8; 32]>;
 
-    let orders = calculate_best_orders(&supported_currencies).await;
+    let orders = calculate_best_orders(&supported_currencies, &lending_market_controller).await;
     
     let mut arbitrage_engine = Arbitrage::new(true);
+    println!("Calculating arbitrage opportunities for {} orders", orders.len());
     arbitrage_engine.calculate_arbitrage_opportunities(&orders);
 
-    println!("Arbitrage opportunities: {:?}", arbitrage_engine.opportunities);
+    // Execute the best opportunities for each maturity
+    let opportunities_by_maturity = arbitrage_engine.opportunities.values().cloned().collect::<Vec<_>>();
+    for opportunities in opportunities_by_maturity {        
+        execute_best_opportunity(&opportunities, &lending_market_controller).await;
+    }
+
+    println!("Done");
 }

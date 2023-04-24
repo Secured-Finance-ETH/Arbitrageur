@@ -28,3 +28,12 @@ pub fn bytes32_to_string(bytes: &[u8; 32]) -> Result<String, std::str::Utf8Error
   let utf8_str = std::str::from_utf8(&bytes[..end])?;
   Ok(utf8_str.to_string())
 }
+
+pub fn string_to_bytes32(s: &str) -> [u8; 32] {
+  let mut bytes32: [u8; 32] = [0; 32];
+  let bytes = s.as_bytes();
+  let len = bytes.len().min(32);
+
+  bytes32[..len].copy_from_slice(&bytes[..len]);
+  bytes32
+}
