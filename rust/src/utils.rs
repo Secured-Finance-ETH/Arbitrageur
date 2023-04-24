@@ -22,3 +22,9 @@ pub fn to_ref<T:Clone>(data_refs: Vec<&T>) -> Vec<T> {
   let data = data_refs.into_iter().map(|x| x.clone()).collect();
   data
 }
+
+pub fn bytes32_to_string(bytes: &[u8; 32]) -> Result<String, std::str::Utf8Error> {
+  let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+  let utf8_str = std::str::from_utf8(&bytes[..end])?;
+  Ok(utf8_str.to_string())
+}

@@ -1,3 +1,4 @@
+use ethers::types::U256;
 use num_enum::TryFromPrimitive;
 use std::{collections::HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -6,30 +7,30 @@ use crate::utils;
 
 #[derive(Debug, PartialEq, Clone, TryFromPrimitive)]
 #[repr(u32)]
-enum PositionType {
+pub enum PositionType {
   LEND = 0,
   BORROW = 1,
 }
 
-#[derive(Clone)]
-struct Token {
-  name: Box<str>,
+#[derive(Clone, Debug)]
+pub struct Token {
+  pub name: Box<str>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Order {
-  token: Token,
+  pub token: Token,
   // Price form 0 - 10_000
-  price: i16,
+  pub price: i16,
   // Maturity date is uint256 in the contract, but we can use BigNumberish to represent it
-  maturity: i64,
-  pos_type: PositionType,
+  pub maturity: u64,
+  pub pos_type: PositionType,
   // Amount of tokens in wei
-  amount: i64,
+  pub amount: U256,
 }
 
-
-struct Opportunity {
+#[derive(Debug)]
+pub struct Opportunity {
   borrow_position: Order,
   lend_position: Order,
   // In USD
@@ -37,10 +38,9 @@ struct Opportunity {
 }
 
 pub struct Arbitrage {
-  opportunities: HashMap<i64, Vec<Opportunity>>,
+  pub opportunities: HashMap<i64, Vec<Opportunity>>,
   is_debug_mode: bool,
   token_prices_in_usd: HashMap<String, f64>,
-
 }
 
 
@@ -48,23 +48,29 @@ pub struct Arbitrage {
 impl Arbitrage {
   #[must_use]
   pub fn new(is_debug_mode: bool) -> Arbitrage {
-    let arbitrage = Arbitrage {
+    let mut arbitrage = Arbitrage {
       is_debug_mode,
       opportunities: HashMap::new(),
       token_prices_in_usd: HashMap::new()
     };
 
+    // TODO: Get prices from API
+    arbitrage.token_prices_in_usd.insert("ETH".to_string(), 1.0);
+    arbitrage.token_prices_in_usd.insert("EFIL".to_string(), 1.0);
+    arbitrage.token_prices_in_usd.insert("WBTC".to_string(), 1.0);
+    arbitrage.token_prices_in_usd.insert("USDC".to_string(), 1.0);
+
     arbitrage
   }
 
-  fn maturity_to_fraction(maturity: i64) -> f64 {
+  fn maturity_to_fraction(maturity: u64) -> f64 {
     let one_day_in_seconds: f64 = 24.0 * 60.0 * 60.0;
-    let now_in_seconds: i64;
+    let now_in_seconds: u64;
 
     let now_duration = SystemTime::now().duration_since(UNIX_EPOCH);
     match now_duration {
       Ok(duration) => {
-        let seconds_since_epoch = duration.as_secs() as i64;
+        let seconds_since_epoch = duration.as_secs() as u64;
         now_in_seconds = seconds_since_epoch;
       },
       Err(msg) => panic!("Problem calculating duration since epoch {:?}", msg.to_string())
@@ -76,7 +82,7 @@ impl Arbitrage {
     return days_to_maturity / 365.0;
   }
 
-  fn calculate_rate(price: i32, maturity: i64) -> f64 {
+  fn calculate_rate(price: i32, maturity: u64) -> f64 {
     let mature_price: i32 = 10_000;
 
     return (mature_price - price) as f64 / ((price as f64) * Arbitrage::maturity_to_fraction(maturity));
@@ -121,9 +127,15 @@ impl Arbitrage {
           continue;
         }
 
-        let carry_trade_amount: f64 = rate_differential * (b_order.amount as f64);
+        let carry_trade_amount: f64 = rate_differential * (b_order.amount.as_u64() as f64);
         let token_name = b_order.token.name.to_string();
-        let carry_trade_amount_usd: f64 = carry_trade_amount * self.token_prices_in_usd[&token_name];
+
+        let token_price: f64;
+        match self.token_prices_in_usd.get(&token_name) {
+          Some(price) =>  token_price = *price,
+          None => continue,
+        }
+        let carry_trade_amount_usd: f64 = carry_trade_amount * token_price;
 
         // TODO: Pass as params from "ethers.rs", in USD
         let dex_swap_fee = 0;
@@ -162,7 +174,7 @@ impl Arbitrage {
       let orders_vec_ref = utils::to_ref(orders.1);
 
 
-      self.opportunities.insert(maturity, self.calculate_arbitrage(&orders_vec_ref));
+      self.opportunities.insert(maturity as i64, self.calculate_arbitrage(&orders_vec_ref));
     }
   }
 }
